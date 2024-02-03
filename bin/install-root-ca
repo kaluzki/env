@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+tmpdir=$(mktemp -d --suffix install-root-ca)
+docker compose run --rm --entrypoint=cp -v $tmpdir:/tmp ca -t /tmp /usr/local/bin/step certs/root_ca.crt
+$tmpdir/step certificate install "$@" $tmpdir/root_ca.crt
+# bin/install-root-ca --all
