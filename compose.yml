@@ -51,13 +51,18 @@ services:
       - bash
       - -c
       - |
+        set -e
         
         [ -f ~/.bashrc ] || {
         step completion bash | tee ~/.bashrc
+        # for random passwords the provisioner must be recreated 
+        step ca provisioner remove admin
+        step ca provisioner add admin \
+          --create \
+          --x509-min-dur=1m \
+          --x509-max-dur=240000h \
+          --password-file=secrets/password 
         }
-        
-        step ca provisioner update admin --x509-min-dur=1m --x509-max-dur=240000h \
-        --admin-name=step --password-file=secrets/password --admin-provisioner=admin
         
         step-ca --password-file ~/secrets/password ~/config/ca.json
 
@@ -77,6 +82,8 @@ services:
       - bash
       - -c
       - |
+        set -e
+        
         [ -f /traefik/default-cert.yml ] || {
         tee "/traefik/default-cert.yml" <<EOF
         tls:
@@ -105,7 +112,8 @@ services:
 #    profiles: [_]
     image: traefik:2.10.7
     depends_on:
-      - ca
+      default-cert:
+        condition: service_healthy
     restart: unless-stopped
     ports:
       - "80:80"
