@@ -175,11 +175,11 @@ services:
 
       # https://app.localhost/traefik/
       # see https://github.com/traefik/traefik/issues/5853#issuecomment-663914401
-      traefik.http.routers.traefik.rule: Host(`${ENV_DOMAIN:-app.localhost}`) && (PathPrefix(`/traefik/`) || HeadersRegexp(`Referer`, `.*/traefik/.*`))
+      traefik.http.routers.traefik.rule: ${ENV_TRAEFIK_TR_RULE:-Host(`${ENV_DOMAIN:-app.localhost}`) && (PathPrefix(`/traefik/`) || HeadersRegexp(`Referer`, `.*/traefik/.*`))}
       # see https://doc.traefik.io/traefik/middlewares/http/stripprefixregex/
       traefik.http.middlewares.traefik-strip.stripprefix.prefixes: /traefik/
 
-      traefik.http.routers.traefik.middlewares: auth,traefik-strip
+      traefik.http.routers.traefik.middlewares: ${ENV_TRAEFIK_TR_MIDDLEWARES:-auth,traefik-strip}
       # see https://doc.traefik.io/traefik/middlewares/http/basicauth/
       # sudo apt install -y apache2-utils
       # htpasswd -nB admin
@@ -259,7 +259,9 @@ services:
     profiles:
       - mysql
       - mysql-5
-    image: mysql:5
+    # for arm architecture set
+    # ENV_MYSQL5_IMAGE=biarms/mysql:5.7
+    image: https://${ENV_MYSQL5_IMAGE:-mysql:5}
     restart: unless-stopped
     depends_on:
       mysql-5-cert:
@@ -286,6 +288,7 @@ services:
 
   pma:
     profiles:
+      - pma
       - mysql
       - mysql-5
       - mysql-8
@@ -307,10 +310,7 @@ services:
       traefik.http.routers.pma.entrypoints: 443
       traefik.http.routers.pma.tls: true
       traefik.http.routers.pma.tls.certresolver: letsencrypt
-      traefik.http.routers.pma.rule: Host(`pma.${ENV_DOMAIN:-app.localhost}`)
-
-#      traefik.http.routers.pma.rule: Host(`${ENV_DOMAIN:-app.localhost}`) && PathPrefix(`/pma`)
-#       https://doc.traefik.io/traefik/middlewares/http/stripprefixregex/
-#      traefik.http.middlewares.pma-strip.stripprefix.prefixes: /pma/
-#      traefik.http.routers.pma.middlewares: auth,pma-strip
-
+      traefik.http.routers.pma.rule: ${ENV_PMA_TR_RULE:-Host(`${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`${ENV_PMA_TR_PATH:-/pma}`)}
+      # https://doc.traefik.io/traefik/middlewares/http/stripprefixregex/
+      traefik.http.middlewares.pma-strip.stripprefix.prefixes: ${ENV_PMA_TR_PATH:-/pma}/
+      traefik.http.routers.pma.middlewares: ${ENV_PMA_TR_MIDDLEWARES:-auth,pma-strip}
