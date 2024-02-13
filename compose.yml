@@ -237,6 +237,7 @@ services:
         condition: service_healthy
     image: smallstep/step-ca:0.25.2
     restart: unless-stopped
+    user: root
     volumes:
       - step:/home/step
       - tls:/run/tls
@@ -244,12 +245,18 @@ services:
       - sh
       - -c
       - |
+        set -e
+        
         step ca certificate --force --provisioner=admin --password-file=secrets/password \
         --kty=RSA \
         --not-after=2400h \
         mysql-5 /run/tls/mysql-5.crt /run/tls/mysql-5.key
-        
+
+        [ -f /run/tls/mysql-5-ca.crt ] || {
         step ca root > /run/tls/mysql-5-ca.crt
+        }
+
+        chown 999:999 /run/tls/mysql-5.crt /run/tls/mysql-5.key /run/tls/mysql-5-ca.crt
         
         step ca renew --daemon --renew-period=30s \
           --exec="touch /dev/null" \
@@ -261,12 +268,11 @@ services:
       - mysql-5
     # for arm architecture set
     # ENV_MYSQL5_IMAGE=biarms/mysql:5.7
-    image: https://${ENV_MYSQL5_IMAGE:-mysql:5}
+    image: ${ENV_MYSQL5_IMAGE:-mysql:5}
     restart: unless-stopped
     depends_on:
       mysql-5-cert:
         condition: service_healthy
-    user: "${UID:-1000}:${GID:-1000}"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -277,7 +283,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
     ports:
-      - "3306:3306"
+      - "3306:${ENV_MYSQL5_PORT:-3306}"
     command:
       - --ssl
       - --tls-version=TLSv1.2,TLSv1.3
@@ -303,8 +309,8 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
       PMA_HOSTS: mysql-5,mysql-8
+      PMA_ABSOLUTE_URI: https://${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}${ENV_PMA_TR_PATH:-/pma}
     #      PMA_ARBITRARY: ${PMA_ARBITRARY:-1}
-    #      PMA_ABSOLUTE_URI: https://${ENV_DOMAIN:-app.localhost}/pma/
     labels:
       traefik.enable: true
       traefik.http.routers.pma.entrypoints: 443
