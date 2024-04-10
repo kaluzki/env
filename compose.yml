@@ -315,6 +315,21 @@ services:
       traefik.http.routers.pma.tls: true
       traefik.http.routers.pma.tls.certresolver: letsencrypt
       traefik.http.routers.pma.rule: ${ENV_PMA_TR_RULE:-Host(`${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`${ENV_PMA_TR_PATH:-/pma}`)}
-      # https://doc.traefik.io/traefik/middlewares/http/stripprefixregex/
       traefik.http.middlewares.pma-strip.stripprefix.prefixes: ${ENV_PMA_TR_PATH:-/pma}/
       traefik.http.routers.pma.middlewares: ${ENV_PMA_TR_MIDDLEWARES:-auth,pma-strip}
+
+  mailhog:
+    profiles:
+      - mailhog
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    labels:
+      traefik.enable: true
+      traefik.http.services.mailhog.loadbalancer.server.port: 8025
+      traefik.http.routers.mailhog.service: mailhog
+      traefik.http.routers.mailhog.entrypoints: 443
+      traefik.http.routers.mailhog.tls: true
+      traefik.http.routers.mailhog.tls.certresolver: letsencrypt
+      traefik.http.routers.mailhog.rule: ${ENV_MAILHOG_TR_RULE:-Host(`${ENV_MAILHOG_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`${ENV_MAILHOG_TR_PATH:-/mailhog}`)}
+      traefik.http.middlewares.mailhog-strip.stripprefix.prefixes: ${ENV_MAILHOG_TR_PATH:-/mailhog}/
+      traefik.http.routers.mailhog.middlewares: ${ENV_MAILHOG_TR_MIDDLEWARES:-auth,mailhog-strip}
