@@ -1,8 +1,6 @@
 # bin/up --profile=mysql
 # bin/install-root-ca --all
 
-version: "3.8"
-
 volumes:
   step:
   tls:
