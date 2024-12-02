@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# bin/run mysql-8 bash
+# bin/mysql -e "SHOW DATABASES;"
+# bin/mysql-dump <your-db>
+
+
+function main() {
+  local TMP_MYSQL_CNF=$(mktemp)
+  cat <<EOF > $TMP_MYSQL_CNF
+[client]
+user=root
+password=${MYSQL_ROOT_PASSWORD}
+host=mysql-$(echo $MYSQL_MAJOR | cut -d. -f1)
+EOF
+
+  local db=${1}; shift
+  local dst=${db}-$(date +%y%m%d-%H%M)
+  mkdir -p ${dst}
+  local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '${db}';"
+  local table
+  for table in $(mysql --defaults-extra-file=$TMP_MYSQL_CNF -NBA -e "$sql")
+  do
+      echo "DUMPING TABLE: ${db} ${table} to ${dst}/${table}.sql"
+      mysqldump $@ --defaults-extra-file=$TMP_MYSQL_CNF ${db} ${table} > ${dst}/${table}.sql
+  done
+}
+
+main "$@"
