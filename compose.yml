@@ -10,6 +10,7 @@ volumes:
   prometheus:
   mysql-8:
   mysql-5:
+  mariadb-11:
 
 networks:
   default:
@@ -216,11 +217,113 @@ services:
       traefik.http.routers.prometheus.rule: Host(`${ENV_DOMAIN:-app.localhost}`) && PathPrefix(`/prometheus`)
       traefik.http.routers.prometheus.middlewares: auth
 
+  mariadb-11:
+    profiles:
+      - mariadb
+      - db
+    build:
+      dockerfile_inline: |-
+        FROM mariadb:11
+        
+        RUN cat > /usr/local/sbin/env-prepare <<EOR
+        #!/usr/bin/env bash
+        cat > /tmp/my.extra.cnf <<EOF
+        [client]
+        host=mariadb-11
+        user=root
+        password=\$${MARIADB_ROOT_PASSWORD}
+        EOF
+        EOR
+
+        RUN cat > /usr/local/sbin/env-db <<EOR
+        #!/usr/bin/env bash
+        env-prepare
+        mariadb --defaults-extra-file=/tmp/my.extra.cnf "\$$@"
+        EOR
+
+        RUN cat > /usr/local/sbin/env-dump <<EOR
+        #!/usr/bin/env bash
+        env-prepare
+        mariadb-dump --defaults-extra-file=/tmp/my.extra.cnf "\$$@"
+        EOR
+
+        RUN cat > /usr/local/sbin/env-dump-tables <<EOR
+        #!/usr/bin/env bash
+        function main() {
+          local db=\$${1}; shift
+          local dst=\$${db}-$(date +%y%m%d-%H%M)
+          mkdir -p \$${dst}
+          local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
+          local table
+          for table in \$$(env-db -NBA -e "\$$sql")
+          do
+            echo "DUMPING TABLE: \$${db} \$${table} to \$${dst}/\$${table}.sql"
+            env-dump \$$@ \$${db} \$${table} > \$${dst}/\$${table}.sql
+          done
+        }
+        main "\$$@"
+        EOR
+
+        RUN chmod +x /usr/local/sbin/*
+
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - mariadb-11:/var/lib/mysql
+    environment:
+      MARIADB_USER: ${MARIADB_USER:-${MYSQL_USER:-mysql}}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-${MYSQL_PASSWORD:-mysql}}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}}
+
   mysql-8:
     profiles:
-      - mysql
       - mysql-8
-    image: mysql:8
+      - db
+    build:
+      dockerfile_inline: |-
+        FROM mysql:8
+        
+        RUN cat > /usr/local/sbin/env-prepare <<EOR
+        #!/usr/bin/env bash
+        cat > /tmp/my.extra.cnf <<EOF
+        [client]
+        host=mysql-8
+        user=root
+        password=\$${MYSQL_ROOT_PASSWORD}
+        EOF
+        EOR
+
+        RUN cat > /usr/local/sbin/env-db <<EOR
+        #!/usr/bin/env bash
+        env-prepare
+        mysql --defaults-extra-file=/tmp/my.extra.cnf "\$$@"
+        EOR
+
+        RUN cat > /usr/local/sbin/env-dump <<EOR
+        #!/usr/bin/env bash
+        env-prepare
+        mysqldump --defaults-extra-file=/tmp/my.extra.cnf "\$$@"
+        EOR
+
+        RUN cat > /usr/local/sbin/env-dump-tables <<EOR
+        #!/usr/bin/env bash
+        function main() {
+          local db=\$${1}; shift
+          local dst=\$${db}-$(date +%y%m%d-%H%M)
+          mkdir -p \$${dst}
+          local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
+          local table
+          for table in \$$(env-db -NBA -e "\$$sql")
+          do
+            echo "DUMPING TABLE: \$${db} \$${table} to \$${dst}/\$${table}.sql"
+            env-dump \$$@ \$${db} \$${table} > \$${dst}/\$${table}.sql
+          done
+        }
+        main "\$$@"
+        EOR
+
+        RUN chmod +x /usr/local/sbin/*
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro
@@ -233,8 +336,8 @@ services:
 
   mysql-5-cert:
     profiles:
-      - mysql
       - mysql-5
+      - db
     depends_on:
       ca:
         condition: service_healthy
@@ -267,11 +370,54 @@ services:
 
   mysql-5:
     profiles:
-      - mysql
       - mysql-5
+      - db
     # for arm architecture set
     # ENV_MYSQL5_IMAGE=biarms/mysql:5.7
-    image: ${ENV_MYSQL5_IMAGE:-mysql:5}
+    build:
+      dockerfile_inline: |-
+        FROM ${ENV_MYSQL5_IMAGE:-mysql:5}
+
+        RUN cat > /usr/local/sbin/env-prepare <<EOR
+        #!/usr/bin/env bash
+        cat > /tmp/my.extra.cnf <<EOF
+        [client]
+        host=mysql-5
+        user=root
+        password=\$${MYSQL_ROOT_PASSWORD}
+        EOF
+        EOR
+
+        RUN cat > /usr/local/sbin/env-db <<EOR
+        #!/usr/bin/env bash
+        env-prepare
+        mysql --defaults-extra-file=/tmp/my.extra.cnf "\$$@"
+        EOR
+
+        RUN cat > /usr/local/sbin/env-dump <<EOR
+        #!/usr/bin/env bash
+        env-prepare
+        mysqldump --defaults-extra-file=/tmp/my.extra.cnf "\$$@"
+        EOR
+
+        RUN cat > /usr/local/sbin/env-dump-tables <<EOR
+        #!/usr/bin/env bash
+        function main() {
+          local db=\$${1}; shift
+          local dst=\$${db}-$(date +%y%m%d-%H%M)
+          mkdir -p \$${dst}
+          local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
+          local table
+          for table in \$$(env-db -NBA -e "\$$sql")
+          do
+            echo "DUMPING TABLE: \$${db} \$${table} to \$${dst}/\$${table}.sql"
+            env-dump \$$@ \$${db} \$${table} > \$${dst}/\$${table}.sql
+          done
+        }
+        main "\$$@"
+        EOR
+
+        RUN chmod +x /usr/local/sbin/*
     restart: unless-stopped
     depends_on:
       mysql-5-cert:
@@ -298,7 +444,7 @@ services:
   pma:
     profiles:
       - pma
-      - mysql
+      - db
       - mysql-5
       - mysql-8
     image: phpmyadmin:5
@@ -311,7 +457,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-root}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
-      PMA_HOSTS: mysql-5,mysql-8
+      PMA_HOSTS: mysql-5,mysql-8,mariadb-11
       PMA_ABSOLUTE_URI: https://${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}${ENV_PMA_TR_PATH:-/pma}
     #      PMA_ARBITRARY: ${PMA_ARBITRARY:-1}
     labels:
