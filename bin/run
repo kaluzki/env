@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # examples
-# ~/apps/.env/bin/run mariadb-11 env-db -e"CREATE DATABASE IF NOT EXISTS foo_bar"
-# ~/apps/.env/bin/run mariadb-11 env-dump-tables foo_bar
-# ~/apps/.env/bin/run mariadb-11 bash
+# ~/apps/env/bin/run mariadb-11 env-db -e"CREATE DATABASE IF NOT EXISTS foo_bar"
+# ~/apps/env/bin/run mariadb-11 env-dump-tables foo_bar
+# ~/apps/env/bin/run mariadb-11 bash
 # cat foo_bar-YYMMDD-hhmm/*sql | env-db foo_bar
 
 docker compose -f $(dirname "$0")/../compose.yml run --rm -it -u $(id -u):$(id -g) -v $(pwd):/app -w /app "$@"
