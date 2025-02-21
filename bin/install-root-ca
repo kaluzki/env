@@ -2,5 +2,6 @@
 
 tmpdir=$(mktemp -d --suffix install-root-ca)
 docker compose run --rm --entrypoint=cp -v $tmpdir:/tmp ca -t /tmp /usr/local/bin/step certs/root_ca.crt
+command -v certutil > /dev/null || sudo apt install -y libnss3-tools
 $tmpdir/step certificate install "$@" $tmpdir/root_ca.crt
 # bin/install-root-ca --all

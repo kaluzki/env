@@ -21,7 +21,7 @@ services:
 
   init:
 #    profiles: [_]
-    image: smallstep/step-ca:0.25.2
+    image: smallstep/step-ca:latest
     user: root
     volumes:
       - traefik:/mnt/traefik
@@ -35,7 +35,7 @@ services:
 
   ca:
 #    profiles: [_]
-    image: smallstep/step-ca:0.25.2
+    image: smallstep/step-ca:latest
     restart: unless-stopped
     depends_on:
       init:
@@ -72,7 +72,7 @@ services:
   # docker compose run --rm --entrypoint=bash default-cert
   default-cert:
 #    profiles: [_]
-    image: smallstep/step-ca:0.25.2
+    image: smallstep/step-ca:latest
     restart: unless-stopped
     depends_on:
       ca:
@@ -341,7 +341,7 @@ services:
     depends_on:
       ca:
         condition: service_healthy
-    image: smallstep/step-ca:0.25.2
+    image: smallstep/step-ca:latest
     restart: unless-stopped
     user: root
     volumes:
