@@ -113,7 +113,7 @@ services:
 
   traefik:
 #    profiles: [_]
-    image: traefik:2.10.7
+    image: traefik:3
     depends_on:
       default-cert:
         condition: service_healthy
@@ -133,9 +133,10 @@ services:
       - --api=true
       - --api.dashboard=true
       - --api.insecure=false
+      - --api.basePath=/traefik
       #- --api.debug=true
       # https://doc.traefik.io/traefik/observability/logs/
-      - --log.level=warning
+      - --log.level=WARN
       # https://doc.traefik.io/traefik/observability/access-logs/
       - --accesslog=true
       - --accesslog.fields.names.StartUTC=drop
@@ -178,12 +179,12 @@ services:
       # traefik.http.routers.traefik.rule: Host(`traefik.${ENV_DOMAIN:-app.localhost}`)
 
       # https://app.localhost/traefik/
-      # see https://github.com/traefik/traefik/issues/5853#issuecomment-663914401
-      traefik.http.routers.traefik.rule: ${ENV_TRAEFIK_TR_RULE:-Host(`${ENV_DOMAIN:-app.localhost}`) && (PathPrefix(`/traefik/`) || HeadersRegexp(`Referer`, `.*/traefik/.*`))}
+      traefik.http.routers.traefik.rule: ${ENV_TRAEFIK_TR_RULE:-Host(`${ENV_DOMAIN:-app.localhost}`) && (PathPrefix(`/traefik`))}
       # see https://doc.traefik.io/traefik/middlewares/http/stripprefixregex/
-      traefik.http.middlewares.traefik-strip.stripprefix.prefixes: /traefik/
+      traefik.http.middlewares.traefik-path.replacepathregex.regex: ^/traefik/$
+      traefik.http.middlewares.traefik-path.replacepathregex.replacement: /traefik
 
-      traefik.http.routers.traefik.middlewares: ${ENV_TRAEFIK_TR_MIDDLEWARES:-auth,traefik-strip}
+      traefik.http.routers.traefik.middlewares: ${ENV_TRAEFIK_TR_MIDDLEWARES:-auth,traefik-path}
       # see https://doc.traefik.io/traefik/middlewares/http/basicauth/
       # sudo apt install -y apache2-utils
       # htpasswd -nB admin
@@ -193,6 +194,7 @@ services:
 
   prometheus:
     profiles:
+      - _
       - monitoring
     image: prom/prometheus:v2.46.0
     hostname: prometheus
@@ -219,6 +221,7 @@ services:
 
   mariadb-11:
     profiles:
+      - _
       - mariadb
       - db
     build:
@@ -278,6 +281,7 @@ services:
 
   mysql-8:
     profiles:
+      - _
       - mysql-8
       - db
     build:
@@ -336,6 +340,7 @@ services:
 
   mysql-5-cert:
     profiles:
+      - _
       - mysql-5
       - db
     depends_on:
@@ -370,6 +375,7 @@ services:
 
   mysql-5:
     profiles:
+      - _
       - mysql-5
       - db
     # for arm architecture set
@@ -431,8 +437,6 @@ services:
       MYSQL_USER: ${MYSQL_USER:-mysql}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
-    ports:
-      - "3306:${ENV_MYSQL5_PORT:-3306}"
     command:
       - --ssl
       - --tls-version=TLSv1.2,TLSv1.3
@@ -443,6 +447,7 @@ services:
 
   pma:
     profiles:
+      - _
       - pma
       - db
       - mysql-5
@@ -471,6 +476,7 @@ services:
 
   mailhog:
     profiles:
+      - _
       - mailhog
     image: mailhog/mailhog:v1.0.1
     restart: unless-stopped
@@ -481,12 +487,13 @@ services:
       traefik.http.routers.mailhog.entrypoints: 443
       traefik.http.routers.mailhog.tls: true
       traefik.http.routers.mailhog.tls.certresolver: letsencrypt
-      traefik.http.routers.mailhog.rule: ${ENV_MAILHOG_TR_RULE:-Host(`${ENV_MAILHOG_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`${ENV_MAILHOG_TR_PATH:-/mailhog}`)}
-      traefik.http.middlewares.mailhog-strip.stripprefix.prefixes: ${ENV_MAILHOG_TR_PATH:-/mailhog}/
-      traefik.http.routers.mailhog.middlewares: ${ENV_MAILHOG_TR_MIDDLEWARES:-auth,mailhog-strip}
+      traefik.http.routers.mailhog.rule: ${ENV_MAILHOG_TR_RULE:-Host(`${ENV_MAILHOG_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`/mailhog`)}
+      traefik.http.middlewares.mailhog-path.stripprefix.prefixes: /mailhog
+      traefik.http.routers.mailhog.middlewares: ${ENV_MAILHOG_TR_MIDDLEWARES:-auth,mailhog-path}
 
   mail:
     profiles:
+      - _
       - mail
     restart: unless-stopped
     image: mailserver/docker-mailserver:14
