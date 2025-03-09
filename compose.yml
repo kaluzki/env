@@ -278,6 +278,8 @@ services:
       MARIADB_USER: ${MARIADB_USER:-${MYSQL_USER:-mysql}}
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-${MYSQL_PASSWORD:-mysql}}
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}}
+    ports:
+      - ${ENV_MARIADB11_PORT:-127.0.0.1:3306}:3306/tcp
 
   mysql-8:
     profiles:
@@ -337,6 +339,8 @@ services:
       MYSQL_USER: ${MYSQL_USER:-mysql}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
+    ports:
+      - ${ENV_MYSQL8_PORT:-127.0.0.3:3306}:3306/tcp
 
   mysql-5-cert:
     profiles:
@@ -444,6 +448,8 @@ services:
       - --ssl-key=/run/tls/mysql-5.key
 #      - --require-secure-transport=ON
 #      - --ssl-ca=/rum/tls/mysql-5-ca.crt
+    ports:
+      - ${ENV_MYSQL5_PORT:-127.0.0.2:3306}:3306/tcp
 
   pma:
     profiles:
@@ -470,9 +476,9 @@ services:
       traefik.http.routers.pma.entrypoints: 443
       traefik.http.routers.pma.tls: true
       traefik.http.routers.pma.tls.certresolver: letsencrypt
-      traefik.http.routers.pma.rule: ${ENV_PMA_TR_RULE:-Host(`${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`${ENV_PMA_TR_PATH:-/pma}`)}
-      traefik.http.middlewares.pma-strip.stripprefix.prefixes: ${ENV_PMA_TR_PATH:-/pma}/
-      traefik.http.routers.pma.middlewares: ${ENV_PMA_TR_MIDDLEWARES:-auth,pma-strip}
+      traefik.http.routers.pma.rule: ${ENV_PMA_TR_RULE:-Host(`${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`/pma`)}
+      traefik.http.middlewares.pma-path.stripprefix.prefixes: /pma
+      traefik.http.routers.pma.middlewares: ${ENV_PMA_TR_MIDDLEWARES:-auth,pma-path}
 
   mailhog:
     profiles:
