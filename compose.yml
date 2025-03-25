@@ -254,7 +254,7 @@ services:
         #!/usr/bin/env bash
         function main() {
           local db=\$${1}; shift
-          local dst=\$${db}-$(date +%y%m%d-%H%M)
+          local dst=\$${db}-\$$(date +%y%m%d-%H%M)
           mkdir -p \$${dst}
           local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
           local table
@@ -316,7 +316,7 @@ services:
         #!/usr/bin/env bash
         function main() {
           local db=\$${1}; shift
-          local dst=\$${db}-$(date +%y%m%d-%H%M)
+          local dst=\$${db}-\$$(date +%y%m%d-%H%M)
           mkdir -p \$${dst}
           local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
           local table
@@ -414,7 +414,7 @@ services:
         #!/usr/bin/env bash
         function main() {
           local db=\$${1}; shift
-          local dst=\$${db}-$(date +%y%m%d-%H%M)
+          local dst=\$${db}-\$$(date +%y%m%d-%H%M)
           mkdir -p \$${dst}
           local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
           local table
