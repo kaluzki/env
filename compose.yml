@@ -14,10 +14,28 @@ volumes:
 
 networks:
   default:
-    name: ${ENV_NET:-env}
+    name: ${ENV_NET_NAME:-env}
     attachable: true
+    ipam:
+      config:
+        - subnet: 172.22.${ENV_NET:-0}.0/22 #172.22.0.1 - 172.22.23.254
+          ip_range: 172.22.${ENV_NET_RANGE:-2}.0/23 #172.22.2.1 - 172.20.23.254
 
 services:
+
+  tunnel:
+    profiles:
+      - _
+      - tunnel
+    image: cloudflare/cloudflared
+    restart: unless-stopped
+    hostname: tunnel.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}0
+    environment:
+      TUNNEL_TOKEN: ${ENV_TUNNEL_TOKEN}
+    command: tunnel run
 
   init:
 #    profiles: [_]
@@ -118,6 +136,10 @@ services:
       default-cert:
         condition: service_healthy
     restart: unless-stopped
+    hostname: traefik.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}1
     ports:
       - "80:80"
       - "443:443"
@@ -197,7 +219,6 @@ services:
       - _
       - monitoring
     image: prom/prometheus:v2.46.0
-    hostname: prometheus
     container_name: prometheus
     volumes:
       - ./etc/prometheus.yml:/etc/prometheus.yml:ro
@@ -270,6 +291,10 @@ services:
         RUN chmod +x /usr/local/sbin/*
 
     restart: unless-stopped
+    hostname: mariadb-11.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}2
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -331,6 +356,10 @@ services:
 
         RUN chmod +x /usr/local/sbin/*
     restart: unless-stopped
+    hostname: mysql-8.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}3
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -429,6 +458,11 @@ services:
 
         RUN chmod +x /usr/local/sbin/*
     restart: unless-stopped
+    hostname: mysql-5.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}4
+
     depends_on:
       mysql-5-cert:
         condition: service_healthy
@@ -460,6 +494,10 @@ services:
       - mysql-8
     image: phpmyadmin:5
     restart: unless-stopped
+    hostname: pma.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}5
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
@@ -486,6 +524,10 @@ services:
       - mailhog
     image: mailhog/mailhog:v1.0.1
     restart: unless-stopped
+    hostname: mailhog.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}6
     labels:
       traefik.enable: true
       traefik.http.services.mailhog.loadbalancer.server.port: 8025
@@ -503,7 +545,7 @@ services:
       - mail
     restart: unless-stopped
     image: mailserver/docker-mailserver:14
-    hostname: ${ENV_MAIL_DOMAIN:-mail.${ENV_DOMAIN:-app.localhost}}
+    hostname: ${ENV_MAIL_DOMAIN:-mail.${ENV_DOMAIN:-app.localhost}}${ENV_RUN:-}
     ports:
       - "25:${ENV_MAIL_PORT_25-25}"
       - "587:${ENV_MAIL_PORT_587-587}"
