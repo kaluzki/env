@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # examples
-# ~/apps/env/bin/run mariadb-11 env-db -e"CREATE DATABASE IF NOT EXISTS foo_bar"
-# ~/apps/env/bin/run mariadb-11 env-dump-tables foo_bar
-# ~/apps/env/bin/run mariadb-11 bash
-# cat foo_bar-YYMMDD-hhmm/*sql | env-db foo_bar
+# ~/apps/env/bin/run mariadb-11-client env-db -e"CREATE DATABASE stage_db_1"
+# ~/apps/env/bin/run mysql-8-client env-dump-tables stage_db_1
+# ~/apps/env/bin/run mysql-5-client
+# cat stage_db_1/*.sql local_db_1/*.sql | env-db stage_db_1
 
-ENV_RUN=1 docker compose -f $(dirname "$0")/../compose.yml run \
+docker compose -f $(dirname "$0")/../compose.yml run \
   --rm -it \
   -u $(id -u):$(id -g) \
   -v $(pwd):/app -w /app \

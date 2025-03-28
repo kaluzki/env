@@ -26,16 +26,16 @@ services:
   tunnel:
     profiles:
       - _
-      - tunnel
     image: cloudflare/cloudflared
     restart: unless-stopped
-    hostname: tunnel.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    hostname: tunnel.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}
     networks:
       default:
-        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}0
+        ipv4_address: 172.22.${ENV_NET:-0}.100
     environment:
-      TUNNEL_TOKEN: ${ENV_TUNNEL_TOKEN}
+      TUNNEL_TOKEN: ${ENV_TUNNEL_TOKEN:-}
     command: tunnel run
+
 
   init:
 #    profiles: [_]
@@ -50,6 +50,7 @@ services:
       - bash
       - -c
       - mkdir -p /mnt/mail/{config,storage,state,logs} && chown step:step /mnt -R
+
 
   ca:
 #    profiles: [_]
@@ -67,7 +68,6 @@ services:
       DOCKER_STEPCA_INIT_ACME: "true"
       DOCKER_STEPCA_INIT_SSH: "true"
 #      DOCKER_STEPCA_INIT_REMOTE_MANAGEMENT: "true"
-
     command:
       - bash
       - -c
@@ -86,6 +86,7 @@ services:
         }
         
         step-ca --password-file ~/secrets/password ~/config/ca.json
+
 
   # docker compose run --rm --entrypoint=bash default-cert
   default-cert:
@@ -129,6 +130,7 @@ services:
           --exec="touch /traefik/default-cert.yml" \
           /run/tls/traefik.crt /run/tls/traefik.key
 
+
   traefik:
 #    profiles: [_]
     image: traefik:3
@@ -136,10 +138,10 @@ services:
       default-cert:
         condition: service_healthy
     restart: unless-stopped
-    hostname: traefik.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    hostname: traefik.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}
     networks:
       default:
-        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}1
+        ipv4_address: 172.22.${ENV_NET:-0}.101
     ports:
       - "80:80"
       - "443:443"
@@ -182,30 +184,24 @@ services:
       - --entrypoints.443.address=:443
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=80
-
       - --certificatesresolvers.ca.acme.caserver=https://ca:9000/acme/acme/directory
       #      - --certificatesresolvers.ca.acme.email=ignore@localhost
       - --certificatesresolvers.ca.acme.tlsChallenge=true
-
       # https://doc.traefik.io/traefik/routing/overview/#rootcas
       - --serversTransport.rootCAs=/run/tls/traefik-ca.crt
-
     labels:
       traefik.enable: true
       traefik.http.routers.traefik.service: api@internal
       traefik.http.routers.traefik.entrypoints: 443
       traefik.http.routers.traefik.tls: true
       traefik.http.routers.traefik.tls.certresolver: letsencrypt
-
       # https://traefik.app.localhost/
       # traefik.http.routers.traefik.rule: Host(`traefik.${ENV_DOMAIN:-app.localhost}`)
-
       # https://app.localhost/traefik/
       traefik.http.routers.traefik.rule: ${ENV_TRAEFIK_TR_RULE:-Host(`${ENV_DOMAIN:-app.localhost}`) && (PathPrefix(`/traefik`))}
       # see https://doc.traefik.io/traefik/middlewares/http/stripprefixregex/
       traefik.http.middlewares.traefik-path.replacepathregex.regex: ^/traefik/$
       traefik.http.middlewares.traefik-path.replacepathregex.replacement: /traefik
-
       traefik.http.routers.traefik.middlewares: ${ENV_TRAEFIK_TR_MIDDLEWARES:-auth,traefik-path}
       # see https://doc.traefik.io/traefik/middlewares/http/basicauth/
       # sudo apt install -y apache2-utils
@@ -214,16 +210,15 @@ services:
       # admin/admin
       traefik.http.middlewares.auth.basicauth.users: ${ENV_AUTH:-admin:$$2y$$05$$yrOjlUeRyiwyOhg8mR42HuJeuQXJdZOFcwgHk3eDU5vD5E2AzyaDa}
 
+
   prometheus:
     profiles:
       - _
-      - monitoring
     image: prom/prometheus:v2.46.0
     container_name: prometheus
     volumes:
       - ./etc/prometheus.yml:/etc/prometheus.yml:ro
       - prometheus:/data
-
     # https://prometheus.io/docs/prometheus/latest/command-line/prometheus/
     command:
       - --log.level=warn
@@ -243,8 +238,27 @@ services:
   mariadb-11:
     profiles:
       - _
-      - mariadb
-      - db
+    image: mariadb:11
+    restart: unless-stopped
+    hostname: mariadb-11.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.102
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - mariadb-11:/var/lib/mysql
+    environment:
+      MARIADB_USER: ${MARIADB_USER:-${MYSQL_USER:-mysql}}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-${MYSQL_PASSWORD:-mysql}}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}}
+    ports:
+      - ${ENV_MARIADB11_PORT:-127.0.0.1:3306}:3306/tcp
+
+
+  mariadb-11-client:
+    profiles:
+      - _
     build:
       dockerfile_inline: |-
         FROM mariadb:11
@@ -277,6 +291,8 @@ services:
           local db=\$${1}; shift
           local dst=\$${db}-\$$(date +%y%m%d-%H%M)
           mkdir -p \$${dst}
+          rm -f \$${db}
+          ln -s \$${dst} \$${db}
           local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
           local table
           for table in \$$(env-db -NBA -e "\$$sql")
@@ -289,28 +305,41 @@ services:
         EOR
 
         RUN chmod +x /usr/local/sbin/*
-
-    restart: unless-stopped
-    hostname: mariadb-11.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
-    networks:
-      default:
-        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}2
+    command:
+      - bash
+    restart: no
+    hostname: mariadb-11-client
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - mariadb-11:/var/lib/mysql
     environment:
-      MARIADB_USER: ${MARIADB_USER:-${MYSQL_USER:-mysql}}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-${MYSQL_PASSWORD:-mysql}}
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}}
-    ports:
-      - ${ENV_MARIADB11_PORT:-127.0.0.1:3306}:3306/tcp
+
 
   mysql-8:
     profiles:
       - _
-      - mysql-8
-      - db
+    image: mysql:8
+    restart: unless-stopped
+    hostname: mysql-8.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}
+    networks:
+      default:
+        ipv4_address: 172.22.${ENV_NET:-0}.103
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - mysql-8:/var/lib/mysql
+    environment:
+      MYSQL_USER: ${MYSQL_USER:-mysql}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
+    ports:
+      - ${ENV_MYSQL8_PORT:-127.0.0.3:3306}:3306/tcp
+
+
+  mysql-8-client:
+    profiles:
+      - _
     build:
       dockerfile_inline: |-
         FROM mysql:8
@@ -343,6 +372,8 @@ services:
           local db=\$${1}; shift
           local dst=\$${db}-\$$(date +%y%m%d-%H%M)
           mkdir -p \$${dst}
+          rm -f \$${db}
+          ln -s \$${dst} \$${db}
           local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
           local table
           for table in \$$(env-db -NBA -e "\$$sql")
@@ -355,27 +386,20 @@ services:
         EOR
 
         RUN chmod +x /usr/local/sbin/*
-    restart: unless-stopped
-    hostname: mysql-8.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
-    networks:
-      default:
-        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}3
+    command:
+      - bash
+    restart: no
+    hostname: mysql-8-client
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-      - mysql-8:/var/lib/mysql
     environment:
-      MYSQL_USER: ${MYSQL_USER:-mysql}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
-    ports:
-      - ${ENV_MYSQL8_PORT:-127.0.0.3:3306}:3306/tcp
+
 
   mysql-5-cert:
     profiles:
       - _
-      - mysql-5
-      - db
     depends_on:
       ca:
         condition: service_healthy
@@ -406,11 +430,10 @@ services:
           --exec="touch /dev/null" \
           /run/tls/mysql-5.crt /run/tls/mysql-5.key
 
-  mysql-5:
+
+  mysql-5-client:
     profiles:
       - _
-      - mysql-5
-      - db
     # for arm architecture set
     # ENV_MYSQL5_IMAGE=biarms/mysql:5.7
     build:
@@ -445,6 +468,8 @@ services:
           local db=\$${1}; shift
           local dst=\$${db}-\$$(date +%y%m%d-%H%M)
           mkdir -p \$${dst}
+          rm -f \$${db}
+          ln -s \$${dst} \$${db}
           local sql="SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_TYPE LIKE 'BASE TABLE' AND TABLE_SCHEMA = '\$${db}';"
           local table
           for table in \$$(env-db -NBA -e "\$$sql")
@@ -457,12 +482,25 @@ services:
         EOR
 
         RUN chmod +x /usr/local/sbin/*
+    command:
+      - bash
+    restart: no
+    hostname: mysql-5-client
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-${MYSQL_PASSWORD:-root}}
+
+  mysql-5:
+    profiles:
+      - _
+    image: ${ENV_MYSQL5_IMAGE:-mysql:5}
     restart: unless-stopped
-    hostname: mysql-5.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    hostname: mysql-5.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}
     networks:
       default:
-        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}4
-
+        ipv4_address: 172.22.${ENV_NET:-0}.104
     depends_on:
       mysql-5-cert:
         condition: service_healthy
@@ -488,20 +526,15 @@ services:
   pma:
     profiles:
       - _
-      - pma
-      - db
-      - mysql-5
-      - mysql-8
     image: phpmyadmin:5
     restart: unless-stopped
-    hostname: pma.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    hostname: pma.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}
     networks:
       default:
-        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}5
+        ipv4_address: 172.22.${ENV_NET:-0}.105
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-
     environment:
       MYSQL_USER: ${MYSQL_USER:-root}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root}
@@ -521,13 +554,12 @@ services:
   mailhog:
     profiles:
       - _
-      - mailhog
     image: mailhog/mailhog:v1.0.1
     restart: unless-stopped
-    hostname: mailhog.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}${ENV_RUN:-}
+    hostname: mailhog.${ENV_TUNNEL_NAME:-${ENV_NET:-0}}
     networks:
       default:
-        ipv4_address: 172.22.${ENV_NET:-0}.1${ENV_RUN:-0}6
+        ipv4_address: 172.22.${ENV_NET:-0}.106
     labels:
       traefik.enable: true
       traefik.http.services.mailhog.loadbalancer.server.port: 8025
@@ -542,26 +574,23 @@ services:
   mail:
     profiles:
       - _
-      - mail
     restart: unless-stopped
     image: mailserver/docker-mailserver:14
-    hostname: ${ENV_MAIL_DOMAIN:-mail.${ENV_DOMAIN:-app.localhost}}${ENV_RUN:-}
+    hostname: ${ENV_MAIL_DOMAIN:-mail.${ENV_DOMAIN:-app.localhost}}
     ports:
-      - "25:${ENV_MAIL_PORT_25-25}"
-      - "587:${ENV_MAIL_PORT_587-587}"
-      - "465:${ENV_MAIL_PORT_465-465}"
-      - "993:${ENV_MAIL_PORT_993-993}"
+      - "25:${ENV_MAIL_PORT_25:-25}"
+      - "587:${ENV_MAIL_PORT_587:-587}"
+      - "465:${ENV_MAIL_PORT_465:-465}"
+      - "993:${ENV_MAIL_PORT_993:-993}"
     volumes:
       - letsencrypt:/etc/letsencrypt
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
-
       # https://docker-mailserver.github.io/docker-mailserver/edge/config/advanced/optional-config/
       - ${ENV_MAIL_VOLUME_CONFIG:-/mail/config:/tmp/docker-mailserver}
       - ${ENV_MAIL_VOLUME_STORAGE:-/mail/storage:/var/mail}
       - ${ENV_MAIL_VOLUME_STATE:-/mail/state:/var/mail-state}
       - ${ENV_MAIL_VOLUME_LOGS:-/mail/logs:/var/log/mail}
-
     environment: # https://docker-mailserver.github.io/docker-mailserver/edge/config/environment/
       SSL_TYPE: ${ENV_MAIL_SSL_TYPE-letsencrypt}
       SSL_DOMAIN: ${ENV_MAIL_DOMAIN:-mail.${ENV_DOMAIN:-app.localhost}}
