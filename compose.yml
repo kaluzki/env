@@ -190,25 +190,25 @@ services:
       # https://doc.traefik.io/traefik/routing/overview/#rootcas
       - --serversTransport.rootCAs=/run/tls/traefik-ca.crt
     labels:
-      traefik.enable: true
-      traefik.http.routers.traefik.service: api@internal
-      traefik.http.routers.traefik.entrypoints: 443
-      traefik.http.routers.traefik.tls: true
-      traefik.http.routers.traefik.tls.certresolver: letsencrypt
+      - traefik.enable=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-traefik.service=api@internal
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-traefik.entrypoints=443
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-traefik.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-traefik.tls.certresolver=letsencrypt
       # https://traefik.app.localhost/
-      # traefik.http.routers.traefik.rule: Host(`traefik.${ENV_DOMAIN:-app.localhost}`)
+      # - traefik.http.routers.${COMPOSE_PROJECT_NAME}-traefik.rule=Host(`traefik.${ENV_DOMAIN:-app.localhost}`)
       # https://app.localhost/traefik/
-      traefik.http.routers.traefik.rule: ${ENV_TRAEFIK_TR_RULE:-Host(`${ENV_DOMAIN:-app.localhost}`) && (PathPrefix(`/traefik`))}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-traefik.rule=${ENV_TRAEFIK_TR_RULE:-Host(`${ENV_DOMAIN:-app.localhost}`) && (PathPrefix(`/traefik`))}
       # see https://doc.traefik.io/traefik/middlewares/http/stripprefixregex/
-      traefik.http.middlewares.traefik-path.replacepathregex.regex: ^/traefik/$
-      traefik.http.middlewares.traefik-path.replacepathregex.replacement: /traefik
-      traefik.http.routers.traefik.middlewares: ${ENV_TRAEFIK_TR_MIDDLEWARES:-auth,traefik-path}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-traefik-path.replacepathregex.regex=^/traefik/$
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-traefik-path.replacepathregex.replacement=/traefik
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-traefik.middlewares=${ENV_TRAEFIK_TR_MIDDLEWARES:-${COMPOSE_PROJECT_NAME}-auth,${COMPOSE_PROJECT_NAME}-traefik-path}
       # see https://doc.traefik.io/traefik/middlewares/http/basicauth/
       # sudo apt install -y apache2-utils
       # htpasswd -nB admin
       # escape '$' with '$$' in compose.yml
       # admin/admin
-      traefik.http.middlewares.auth.basicauth.users: ${ENV_AUTH:-admin:$$2y$$05$$yrOjlUeRyiwyOhg8mR42HuJeuQXJdZOFcwgHk3eDU5vD5E2AzyaDa}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-auth.basicauth.users=${ENV_AUTH:-admin:$$2y$$05$$yrOjlUeRyiwyOhg8mR42HuJeuQXJdZOFcwgHk3eDU5vD5E2AzyaDa}
 
 
   prometheus:
@@ -226,14 +226,14 @@ services:
       - --storage.tsdb.retention.size=256MB
       - --web.external-url=/prometheus/
     labels:
-      traefik.enable: true
-      traefik.http.services.prometheus.loadbalancer.server.port: 9090
-      traefik.http.routers.prometheus.service: prometheus
-      traefik.http.routers.prometheus.entrypoints: 443
-      traefik.http.routers.prometheus.tls: true
-      traefik.http.routers.prometheus.tls.certresolver: letsencrypt
-      traefik.http.routers.prometheus.rule: Host(`${ENV_DOMAIN:-app.localhost}`) && PathPrefix(`/prometheus`)
-      traefik.http.routers.prometheus.middlewares: auth
+      - traefik.enable=true
+      - traefik.http.services.${COMPOSE_PROJECT_NAME}-prometheus.loadbalancer.server.port=9090
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-prometheus.service=prometheus
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-prometheus.entrypoints=443
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-prometheus.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-prometheus.tls.certresolver=letsencrypt
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-prometheus.rule=Host(`${ENV_DOMAIN:-app.localhost}`) && PathPrefix(`/prometheus`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-prometheus.middlewares=${COMPOSE_PROJECT_NAME}-auth
 
   mariadb-11:
     profiles:
@@ -543,13 +543,13 @@ services:
       PMA_ABSOLUTE_URI: https://${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}${ENV_PMA_TR_PATH:-/pma}
     #      PMA_ARBITRARY: ${PMA_ARBITRARY:-1}
     labels:
-      traefik.enable: true
-      traefik.http.routers.pma.entrypoints: 443
-      traefik.http.routers.pma.tls: true
-      traefik.http.routers.pma.tls.certresolver: letsencrypt
-      traefik.http.routers.pma.rule: ${ENV_PMA_TR_RULE:-Host(`${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`/pma`)}
-      traefik.http.middlewares.pma-path.stripprefix.prefixes: /pma
-      traefik.http.routers.pma.middlewares: ${ENV_PMA_TR_MIDDLEWARES:-auth,pma-path}
+      - traefik.enable=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-pma.entrypoints=443
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-pma.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-pma.tls.certresolver=letsencrypt
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-pma.rule=${ENV_PMA_TR_RULE:-Host(`${ENV_PMA_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`/pma`)}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-pma.middlewares=${ENV_PMA_TR_MIDDLEWARES:-${COMPOSE_PROJECT_NAME}-auth,${COMPOSE_PROJECT_NAME}-pma-path}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-pma-path.stripprefix.prefixes=/pma
 
   mailhog:
     profiles:
@@ -561,15 +561,15 @@ services:
       default:
         ipv4_address: 172.22.${ENV_NET:-0}.106
     labels:
-      traefik.enable: true
-      traefik.http.services.mailhog.loadbalancer.server.port: 8025
-      traefik.http.routers.mailhog.service: mailhog
-      traefik.http.routers.mailhog.entrypoints: 443
-      traefik.http.routers.mailhog.tls: true
-      traefik.http.routers.mailhog.tls.certresolver: letsencrypt
-      traefik.http.routers.mailhog.rule: ${ENV_MAILHOG_TR_RULE:-Host(`${ENV_MAILHOG_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`/mailhog`)}
-      traefik.http.middlewares.mailhog-path.stripprefix.prefixes: /mailhog
-      traefik.http.routers.mailhog.middlewares: ${ENV_MAILHOG_TR_MIDDLEWARES:-auth,mailhog-path}
+      - traefik.enable=true
+      - traefik.http.services.${COMPOSE_PROJECT_NAME}-mailhog.loadbalancer.server.port=8025
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-mailhog.service=${COMPOSE_PROJECT_NAME}-mailhog
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-mailhog.entrypoints=443
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-mailhog.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-mailhog.tls.certresolver=letsencrypt
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-mailhog.rule=${ENV_MAILHOG_TR_RULE:-Host(`${ENV_MAILHOG_TR_HOST:-${ENV_DOMAIN:-app.localhost}}`) && PathPrefix(`/mailhog`)}
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}-mailhog.middlewares=${ENV_MAILHOG_TR_MIDDLEWARES:-${COMPOSE_PROJECT_NAME}-auth,${COMPOSE_PROJECT_NAME}-mailhog-path}
+      - traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-mailhog-path.stripprefix.prefixes=/mailhog
 
   mail:
     profiles:

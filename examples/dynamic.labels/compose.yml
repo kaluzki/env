@@ -1,0 +1,24 @@
+# docker compose up -d
+# https://app.localhost/traefik/dashboard/#/http/routers/dynamiclabels{app}@docker
+# https://dynamiclabels.app.localhost/
+#
+# docker compose -p foo-bar up -d
+# https://app.localhost/traefik/dashboard/#/http/routers/foo-bar{app}@docker
+# https://foo-bar.app.localhost/
+
+networks:
+  default:
+    name: ${ENV_NET_NAME:-env}
+    external: true
+
+services:
+  app:
+    image: httpd
+    volumes:
+      - .:/usr/local/apache2/htdocs
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}{app}.entrypoints=443
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}{app}.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}{app}.rule=Host(`${ENV_URL:-${COMPOSE_PROJECT_NAME}.app.localhost}`)
+      - traefik.http.services.${COMPOSE_PROJECT_NAME}{app}.loadbalancer.server.port=80
